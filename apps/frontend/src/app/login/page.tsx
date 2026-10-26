@@ -61,10 +61,10 @@ export default function LoginPage() {
               label: '登录',
               children: (
                 <Form layout="vertical" onFinish={onLogin} requiredMark={false}>
-                  <Form.Item name="username" rules={usernameRule} initialValue="admin">
+                  <Form.Item name="username" rules={usernameRule}>
                     <Input placeholder="用户名" size="large" />
                   </Form.Item>
-                  <Form.Item name="password" rules={passwordRule} initialValue="admin123">
+                  <Form.Item name="password" rules={passwordRule}>
                     <Input.Password placeholder="密码" size="large" />
                   </Form.Item>
                   <Button type="primary" htmlType="submit" block size="large" loading={loading}>

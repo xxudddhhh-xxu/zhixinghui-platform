@@ -1,0 +1,97 @@
+# 智星惠生产编排: 基础设施 + RAG + 后端 + 前端 一键上云
+# 用法: cp .env.prod.example .env.prod && 编辑后 docker compose -f docker-compose.prod.yml up -d --build
+name: zhixinghui-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: zxh-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres123}
+      POSTGRES_DB: ${DB_NAME:-zhixinghui}
+    volumes:
+      - zxh_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-zhixinghui}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: zxh-redis
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - zxh_redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: zxh-qdrant
+    volumes:
+      - zxh_qdrantdata:/qdrant/storage
+    healthcheck:
+      test: ['CMD-SHELL', 'bash -c ":< /dev/tcp/127.0.0.1/6333"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rag:
+    build:
+      context: .
+      dockerfile: docker/rag.Dockerfile
+    image: zhixinghui/rag:latest
+    env_file: .env.prod
+    environment:
+      QDRANT_URL: http://qdrant:6333
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    image: zhixinghui/backend:latest
+    env_file: .env.prod
+    environment:
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RAG_SERVICE_URL: http://rag:8000
+    ports:
+      - '3002:3002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rag:
+        condition: service_started
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+      args:
+        # NEXT_PUBLIC_API_BASE 构建期打进客户端包,指向用户可达的后端地址
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:3002/api}
+    image: zhixinghui/frontend:latest
+    environment:
+      PORT: 3200
+    ports:
+      - '3200:3200'
+    depends_on:
+      - backend
+
+volumes:
+  zxh_pgdata:
+  zxh_redisdata:
+  zxh_qdrantdata:

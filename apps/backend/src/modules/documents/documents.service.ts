@@ -14,6 +14,7 @@ import { PermissionCacheService } from '../../infra/permission-cache.service';
 import { AuditService } from '../audit/audit.service';
 import { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { actionSatisfies, effectiveDocAction, TeamRole } from '../../common/utils/permission.util';
+import { exportHtmlDocument } from '../../common/utils/markdown-lite.util';
 
 export interface DocTreeNode {
   id: string;
@@ -292,6 +293,59 @@ export class DocumentsService {
     await this.permCache.invalidate(userId);
     await this.audit.log(user.id, user.username, 'DOC_MEMBER_SET', `doc:${docId}`, { userId, role });
     return true;
+  }
+
+  /** 共享给我的跨团队文档(文档级授权的白名单入口) */
+  async sharedDocs(user: CurrentUserData) {
+    if (user.globalRole === 'admin') return [];
+    const grants = await this.docMemberRepo.find({ where: { userId: user.id } });
+    if (!grants.length) return [];
+    const docs = await this.docRepo.find({ where: { id: In(grants.map((g) => g.documentId)) } });
+    const snap = await this.permCache.getSnapshot(user.id);
+    const { Team } = await import('../teams/entities/team.entity');
+    const teams = await this.docMemberRepo.manager
+      .getRepository(Team)
+      .find({ where: { id: In([...new Set(docs.map((d) => d.teamId))]) } });
+    const tMap = new Map(teams.map((t) => [t.id, t.name]));
+    return docs
+      .filter((d) => !snap.teams[d.teamId]) // 本团队文档已在左侧树内,不重复
+      .map((d) => ({
+        id: d.id,
+        title: d.title,
+        teamId: d.teamId,
+        teamName: tMap.get(d.teamId) ?? '',
+        myRole: (snap.docs[d.id] as string) ?? null,
+        updatedAt: d.updatedAt,
+      }));
+  }
+
+  /** 导出文档: md 原文 / html 网页 / doc(Word 兼容 HTML) */
+  async exportDoc(user: CurrentUserData, id: string, format: 'md' | 'html' | 'doc') {
+    const doc = await this.docRepo.findOne({ where: { id } });
+    if (!doc) throw new NotFoundException('文档不存在');
+    if (user.globalRole !== 'admin') {
+      const snap = await this.permCache.getSnapshot(user.id);
+      const eff = effectiveDocAction(
+        (snap.teams[doc.teamId] as TeamRole) ?? null,
+        (snap.docs[id] as any) ?? null,
+      );
+      if (!eff) throw new ForbiddenException('无该文档访问权限(跨团队资源隔离)');
+    }
+    const safeName = (doc.title ?? 'document').replace(/[\\/:*?"<>|\r\n]/g, '_').trim() || 'document';
+    await this.audit.log(user.id, user.username, 'DOC_EXPORT', `doc:${id}`, { format });
+    if (format === 'md') {
+      return {
+        filename: `${safeName}.md`,
+        contentType: 'text/markdown; charset=utf-8',
+        body: `# ${doc.title}\n\n${doc.content ?? ''}`,
+      };
+    }
+    return {
+      filename: `${safeName}.${format}`,
+      contentType:
+        format === 'doc' ? 'application/msword; charset=utf-8' : 'text/html; charset=utf-8',
+      body: exportHtmlDocument(doc.title, doc.content ?? '', format === 'doc'),
+    };
   }
 
   /** 公开文档详情(ISR 页面数据,匿名可访问) */

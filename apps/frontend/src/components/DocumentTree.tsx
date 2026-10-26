@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Key } from 'react';
-import { Button, Dropdown, Input, Modal, Space, Tree, message } from 'antd';
+import { Button, Dropdown, Input, Modal, Select, Space, Tree, message } from 'antd';
 import { docPublicHref } from '@/lib/docPublicHref';
 import {
   DeleteOutlined,
@@ -17,6 +17,7 @@ import {
   ReloadOutlined,
   SearchOutlined,
   UploadOutlined,
+  UserAddOutlined,
 } from '@ant-design/icons';
 import type { DataNode } from 'antd/es/tree';
 import { api } from '@/lib/request';
@@ -51,6 +52,40 @@ export default function DocumentTree({ teamId, selectedId, onSelect, canManageTe
   const uploadParent = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const revealedFor = useRef<string>('');
+
+  // ===== 文档级授权(跨团队白名单共享) =====
+  const [grantDoc, setGrantDoc] = useState<{ id: string; title: string } | null>(null);
+  const [docMembers, setDocMembers] = useState<{ userId: string; username: string; nickname: string; role: string }[]>([]);
+  const [candidates, setCandidates] = useState<{ id: string; username: string; nickname: string }[]>([]);
+  const [grantUserId, setGrantUserId] = useState<string | null>(null);
+  const [grantRole, setGrantRole] = useState<'editor' | 'viewer'>('viewer');
+
+  const openGrant = async (node: WrappedNode) => {
+    setGrantDoc({ id: node.id, title: node.title });
+    setGrantUserId(null);
+    try {
+      const [members, cands] = await Promise.all([
+        api.get<any[]>(`/documents/${node.id}/members`, { cacheMs: 0 }),
+        api.get<any[]>(`/teams/${teamId}/candidates`, { cacheMs: 0 }).catch(() => []),
+      ]);
+      setDocMembers(members);
+      setCandidates(cands);
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
+
+  const doGrant = async (userId: string, role: 'editor' | 'viewer' | null) => {
+    if (!grantDoc) return;
+    try {
+      await api.post(`/documents/${grantDoc.id}/members`, { userId, role: role ?? '' });
+      message.success(role ? '授权成功(即时生效)' : '已移除授权');
+      setGrantUserId(null);
+      setDocMembers(await api.get<any[]>(`/documents/${grantDoc.id}/members`, { cacheMs: 0 }));
+    } catch (e: any) {
+      message.error(e.message);
+    }
+  };
 
   const loadChildren = useCallback(
     async (parentId: string | null): Promise<WrappedNode[]> => {
@@ -250,6 +285,14 @@ export default function DocumentTree({ teamId, selectedId, onSelect, canManageTe
     if (node.isPublic) {
       actions.push({ key: 'public-view', label: '查看公开页', icon: <GlobalOutlined />, onClick: () => window.open(docPublicHref(node.id), '_blank') });
     }
+    if (canManage && node.docType === 'doc') {
+      actions.push({
+        key: 'grant',
+        label: '授权共享',
+        icon: <UserAddOutlined />,
+        onClick: () => openGrant(node),
+      });
+    }
     if (canManage) {
       actions.push({ type: 'divider' });
       actions.push({ key: 'delete', label: '删除', icon: <DeleteOutlined />, danger: true, onClick: () => doDelete(node) });
@@ -401,6 +444,74 @@ export default function DocumentTree({ teamId, selectedId, onSelect, canManageTe
           onPressEnter={doRename}
           autoFocus
         />
+      </Modal>
+
+      <Modal
+        title={`授权共享 · ${grantDoc?.title ?? ''}`}
+        open={!!grantDoc}
+        footer={null}
+        onCancel={() => setGrantDoc(null)}
+        width={500}
+      >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <Select
+            showSearch
+            style={{ flex: 1 }}
+            placeholder="选择要授权的用户(非本团队)"
+            value={grantUserId ?? undefined}
+            onChange={setGrantUserId}
+            filterOption={(input, opt) =>
+              String(opt?.label ?? '').toLowerCase().includes(input.toLowerCase())
+            }
+            options={candidates
+              .filter((c) => !docMembers.some((m) => m.userId === c.id))
+              .map((c) => ({ value: c.id, label: `${c.nickname}(${c.username})` }))}
+          />
+          <Select
+            style={{ width: 104 }}
+            value={grantRole}
+            onChange={setGrantRole}
+            options={[
+              { value: 'editor', label: '可编辑' },
+              { value: 'viewer', label: '只读' },
+            ]}
+          />
+          <Button type="primary" disabled={!grantUserId} onClick={() => grantUserId && doGrant(grantUserId, grantRole)}>
+            授权
+          </Button>
+        </div>
+        {docMembers.length === 0 && (
+          <div style={{ color: '#98a1af', textAlign: 'center', padding: 16, fontSize: 13 }}>
+            暂无授权用户
+          </div>
+        )}
+        {docMembers.map((m) => (
+          <div
+            key={m.userId}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid #f0f2f5' }}
+          >
+            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {m.nickname}
+              <span style={{ color: '#98a1af', fontSize: 12 }}>({m.username})</span>
+            </span>
+            <Select
+              size="small"
+              style={{ width: 96 }}
+              value={m.role}
+              onChange={(v: 'editor' | 'viewer') => doGrant(m.userId, v)}
+              options={[
+                { value: 'editor', label: '可编辑' },
+                { value: 'viewer', label: '只读' },
+              ]}
+            />
+            <Button size="small" type="text" danger onClick={() => doGrant(m.userId, null)}>
+              移除
+            </Button>
+          </div>
+        ))}
+        <div style={{ color: '#98a1af', fontSize: 12, marginTop: 10, lineHeight: 1.7 }}>
+          被授权的跨团队用户会在其左侧「共享给我」列表看到此文档,权限变更即时生效;本团队成员无需单独授权。
+        </div>
       </Modal>
     </div>
   );

@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/__pycache__
+**/*.log
+.git
+.env
+apps/backend/.env
+apps/frontend/.env
+services/rag/.env
+*.md
+docker
+docker-compose*.yml
+scripts

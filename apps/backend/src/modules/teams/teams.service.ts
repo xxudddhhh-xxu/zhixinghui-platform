@@ -24,7 +24,7 @@ export class TeamsService {
       const teams = await this.teamRepo.find({ order: { createdAt: 'ASC' } });
       const members = await this.memberRepo.find();
       const roleOf = (teamId: string) =>
-        members.find((m) => m.teamId === teamId)?.role ?? 'owner';
+        members.find((m) => m.teamId === teamId)?.role ?? 'admin';
       return teams.map((t) => ({ ...t, myRole: roleOf(t.id) }));
     }
     const members = await this.memberRepo.find({

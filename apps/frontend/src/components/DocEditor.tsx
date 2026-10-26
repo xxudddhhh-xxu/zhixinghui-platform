@@ -5,6 +5,7 @@ import {
   Alert,
   Button,
   Drawer,
+  Dropdown,
   Empty,
   Input,
   Modal,
@@ -19,12 +20,13 @@ import {
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
+  ExportOutlined,
   EyeOutlined,
   HistoryOutlined,
   LoadingOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
-import { api, ApiError } from '@/lib/request';
+import { api, ApiError, API_BASE, getToken } from '@/lib/request';
 import { MarkdownView } from '@/components/MarkdownView';
 import type { DocDetail } from '@/types/api';
 
@@ -145,6 +147,30 @@ export default function DocEditor({ docId, onChanged }: { docId: string; onChang
 
   if (!doc) return <div style={{ padding: 40 }}><Empty description="选择左侧文档开始编辑" /></div>;
 
+  // 导出: 鉴权 fetch 拿 blob 触发浏览器下载(md 原文 / html 网页 / Word 兼容 doc)
+  const doExport = async (fmt: 'md' | 'html' | 'doc') => {
+    try {
+      const res = await fetch(`${API_BASE}/documents/${docId}/export?format=${fmt}`, {
+        headers: getToken() ? { Authorization: `Bearer ${getToken()}` } : {},
+      });
+      if (!res.ok) throw new Error(`导出失败 (${res.status})`);
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') ?? '';
+      let name = `${title || 'document'}.${fmt}`;
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/);
+      if (m) name = decodeURIComponent(m[1]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+      message.success(`已导出 ${name}`);
+    } catch (e: any) {
+      message.error(e.message || '导出失败');
+    }
+  };
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#fff' }}>
       <div style={{ padding: '12px 20px', borderBottom: '1px solid #eef0f4' }}>
@@ -182,6 +208,20 @@ export default function DocEditor({ docId, onChanged }: { docId: string; onChang
             <Tooltip title="历史版本">
               <Button size="small" icon={<HistoryOutlined />} onClick={() => { setVersionsOpen(true); loadVersions(); }} />
             </Tooltip>
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'md', label: 'Markdown (.md)', onClick: () => doExport('md') },
+                  { key: 'html', label: '网页 (.html)', onClick: () => doExport('html') },
+                  { key: 'doc', label: 'Word (.doc)', onClick: () => doExport('doc') },
+                ],
+              }}
+            >
+              <Tooltip title="导出文档">
+                <Button size="small" icon={<ExportOutlined />} />
+              </Tooltip>
+            </Dropdown>
             {doc.myAction === 'manage' && (
               <Tooltip title={doc.isPublic ? '已公开(ISR 页面)' : '未公开'}>
                 <Switch

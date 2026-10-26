@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -7,9 +8,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { DocumentsService } from './documents.service';
@@ -88,10 +91,41 @@ export class DocumentsController {
     return this.documentsService.children(user, teamId, parentId || null);
   }
 
+  /** 共享给我的跨团队文档(文档级授权入口,须置于 :id 之前) */
+  @Get('shared')
+  sharedDocs(@CurrentUser() user) {
+    return this.documentsService.sharedDocs(user);
+  }
+
   @Get(':id')
   @RequirePermission({ type: 'document', action: 'read', source: 'param' })
   detail(@CurrentUser() user, @Param('id') id: string) {
     return this.documentsService.detail(user, id);
+  }
+
+  /** 导出文档: ?format=md|html|doc(手动 res.send 绕过全局 JSON 包装,直接输出文件流) */
+  @Get(':id/export')
+  @RequirePermission({ type: 'document', action: 'read', source: 'param' })
+  async exportDoc(
+    @CurrentUser() user,
+    @Param('id') id: string,
+    @Query('format') format: string,
+    @Res() res: Response,
+  ) {
+    if (!['md', 'html', 'doc'].includes(format)) {
+      throw new BadRequestException('format 仅支持 md / html / doc');
+    }
+    const { filename, contentType, body } = await this.documentsService.exportDoc(
+      user,
+      id,
+      format as 'md' | 'html' | 'doc',
+    );
+    const encoded = encodeURIComponent(filename);
+    res.set({
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`,
+    });
+    res.send(body);
   }
 
   @Post()

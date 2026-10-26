@@ -13,3 +13,4 @@ __pycache__/
 .pnpm-store/
 .vercel/
 .isr-route-backup/
+.env.prod
