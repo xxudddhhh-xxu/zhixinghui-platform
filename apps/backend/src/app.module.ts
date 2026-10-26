@@ -31,6 +31,8 @@ import { PermissionGuard } from './common/guards/permission.guard';
         username: String(config.get('DB_USER') ?? 'postgres'),
         password: String(config.get('DB_PASSWORD') ?? 'postgres123'),
         database: String(config.get('DB_NAME') ?? 'zhixinghui'),
+        // 云数据库(如 Supabase)要求 TLS:DB_SSL=true 时启用
+        ssl: config.get('DB_SSL') === 'true' ? { rejectUnauthorized: false } : false,
         autoLoadEntities: true,
         synchronize: true, // 开发环境自动同步表结构
         logging: false,

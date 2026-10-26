@@ -20,6 +20,9 @@ services:
         sync: false
       - key: DB_NAME
         sync: false
+      # Supabase 等云库要求 TLS(Render 无法直连 Supabase IPv6,务必用 IPv4 pooler 连接串)
+      - key: DB_SSL
+        value: true
       # ---- JWT ----
       - key: JWT_SECRET
         generateValue: true
