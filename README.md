@@ -97,6 +97,19 @@ EMBEDDING_ID                                 # 向量模型(见下方降级说�
 - Zustand:auth(登录态持久化)/ chat(流式消息状态机)。
 - ECharts 运营大屏:用户/团队/文档/提问统计卡、14 天问答趋势、模型调用量分布、各团队文档数、高频提问 TOP、安全审计流水。
 
+## 线上部署架构
+
+| 层 | 托管 | 地址 |
+| --- | --- | --- |
+| 前端(静态导出) | Cloudflare Pages(连 GitHub,推 main 自动部署) | https://zhixinghui-platform.pages.dev |
+| 后端 + RAG | Render Docker 单容器(`deploy/Dockerfile`) | https://zhixinghui-api.onrender.com |
+| PostgreSQL | Supabase 免费实例 | - |
+| Redis / Qdrant | 缺省不部署,业务自动降级(权限直查库 / BM25 单路检索) | - |
+
+- 前端 `pnpm build:static` 做纯静态导出(`output: 'export'`);ISR 公开文档页在导出模式下由 `/docs/view` 客户端页承担,托管层 `_redirects` 把 `/docs/:id` 重写到该页
+- 后端 API 地址在构建期经 `NEXT_PUBLIC_API_BASE` 注入前端产物
+- `render.yaml` 为 Render Blueprint:创建服务时按提示填入 Supabase 连接串与模型密钥即可
+
 ## 端到端验证
 
 ```bash

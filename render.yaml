@@ -1,0 +1,40 @@
+# Render Blueprint:智星惠后端(NestJS + Python RAG 单容器)
+# 使用:控制台 New → Blueprint → 选仓库,按提示填入下列 sync:false 变量
+# 数据库用 Supabase PostgreSQL;Redis/Qdrant 缺省自动降级,无需配置
+services:
+  - type: web
+    name: zhixinghui-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/Dockerfile
+    autoDeploy: true
+    envVars:
+      # ---- PostgreSQL(Supabase 连接信息)----
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      # ---- JWT ----
+      - key: JWT_SECRET
+        generateValue: true
+      # ---- AI 模型(OpenAI 兼容中转)----
+      - key: GLM_BASE_URL
+        sync: false
+      - key: GLM_API_KEY
+        sync: false
+      - key: GLM_MODEL_ID
+        sync: false
+      - key: JPT_BASE_URL
+        sync: false
+      - key: JPT_API_KEY
+        sync: false
+      - key: JPT_MODEL_ID
+        sync: false
+      - key: EMBEDDING_ID
+        sync: false
