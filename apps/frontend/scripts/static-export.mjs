@@ -26,7 +26,7 @@ if (!existsSync(isrDir)) {
 process.env.STATIC_EXPORT = '1';
 process.env.NEXT_PUBLIC_STATIC_EXPORT = '1';
 process.env.NEXT_PUBLIC_API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || 'https://zhixinghui-api.onrender.com/api';
+  process.env.NEXT_PUBLIC_API_BASE || 'https://api.xudonghua.online/api';
 
 try {
   execSync('npx next build', { stdio: 'inherit', env: process.env });
