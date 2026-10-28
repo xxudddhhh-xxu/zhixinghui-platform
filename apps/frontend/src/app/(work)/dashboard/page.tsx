@@ -311,8 +311,14 @@ export default function DashboardPage() {
   return (
     <div
       ref={rootRef}
+      className={isFull ? 'zxhDashScroll' : undefined}
       style={{
-        position: 'relative', minHeight: isFull ? '100vh' : 'calc(100vh - 52px)', padding: '18px 20px 26px',
+        position: 'relative',
+        // 全屏时该元素即全屏元素:固定高 100vh 并允许内部纵向滚动,否则内容超高被裁且无滚动条
+        ...(isFull
+          ? { height: '100vh', overflowY: 'auto' }
+          : { minHeight: 'calc(100vh - 52px)' }),
+        padding: '18px 20px 26px',
         background:
           'radial-gradient(1100px 480px at 72% -8%, rgba(79,124,255,.16), transparent 62%),' +
           'radial-gradient(900px 420px at 6% 108%, rgba(34,211,238,.1), transparent 60%),' +
@@ -387,7 +393,14 @@ export default function DashboardPage() {
             {now.toLocaleTimeString('zh-CN', { hour12: false })}
           </span>
         </div>
-        <style>{`@keyframes zxhPulse{0%,100%{opacity:1}50%{opacity:.25}}`}</style>
+        <style>{`
+@keyframes zxhPulse{0%,100%{opacity:1}50%{opacity:.25}}
+.zxhDashScroll::-webkit-scrollbar{width:8px}
+.zxhDashScroll::-webkit-scrollbar-thumb{background:rgba(142,160,201,.35);border-radius:8px}
+.zxhDashScroll::-webkit-scrollbar-thumb:hover{background:rgba(142,160,201,.55)}
+.zxhDashScroll::-webkit-scrollbar-track{background:transparent}
+.zxhDashScroll{scrollbar-width:thin;scrollbar-color:rgba(142,160,201,.35) transparent}
+`}</style>
       </div>
 
       {/* 指标卡 */}

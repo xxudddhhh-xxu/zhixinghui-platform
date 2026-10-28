@@ -16,6 +16,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') implements CanActivate {
   }
 
   canActivate(context: ExecutionContext) {
+    if (context.getType() !== 'http') return true; // WebSocket 连接由 CollabGateway 自行鉴权
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

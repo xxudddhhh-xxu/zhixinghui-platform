@@ -7,12 +7,14 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { AuditModule } from '../audit/audit.module';
+import { CollabModule } from '../collab/collab.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Document, DocumentVersion, DocumentMember]),
     KnowledgeModule,
     AuditModule,
+    CollabModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

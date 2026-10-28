@@ -14,6 +14,7 @@ import { AssistantsModule } from './modules/assistants/assistants.module';
 import { LlmModule } from './modules/llm/llm.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { CollabModule } from './modules/collab/collab.module';
 import { SeedModule } from './modules/seed/seed.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RateLimitGuard } from './common/guards/rate-limit.guard';
@@ -52,6 +53,7 @@ import { PermissionGuard } from './common/guards/permission.guard';
     LlmModule,
     DashboardModule,
     AuditModule,
+    CollabModule,
     SeedModule,
   ],
   providers: [

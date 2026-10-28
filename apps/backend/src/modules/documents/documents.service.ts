@@ -12,6 +12,7 @@ import { DocumentVersion } from './entities/document-version.entity';
 import { DocumentMember } from './entities/document-member.entity';
 import { PermissionCacheService } from '../../infra/permission-cache.service';
 import { AuditService } from '../audit/audit.service';
+import { CollabService } from '../collab/collab.service';
 import { CurrentUserData } from '../../common/decorators/current-user.decorator';
 import { actionSatisfies, effectiveDocAction, TeamRole } from '../../common/utils/permission.util';
 import { exportHtmlDocument } from '../../common/utils/markdown-lite.util';
@@ -37,6 +38,7 @@ export class DocumentsService {
     @InjectRepository(DocumentMember) private docMemberRepo: Repository<DocumentMember>,
     private permCache: PermissionCacheService,
     private audit: AuditService,
+    private collab: CollabService,
   ) {}
 
   /**
@@ -152,6 +154,8 @@ export class DocumentsService {
       },
     );
     await this.audit.log(user.id, user.username, 'DOC_UPDATE', `doc:${id}`, { version: nextVersion });
+    // HTTP 覆盖保存与协同房间互斥:数据库成为新权威,旧房间内存态作废(客户端自动重连重建)
+    if (dto.content !== undefined) this.collab.resetRoom(id);
     return { id, version: nextVersion, updatedAt: new Date() };
   }
 
@@ -198,6 +202,7 @@ export class DocumentsService {
       { title: v.title, content: v.content, version: nextVersion, updatedBy: user.id },
     );
     await this.audit.log(user.id, user.username, 'DOC_RESTORE', `doc:${id}`, { version });
+    this.collab.resetRoom(id); // 恢复历史后数据库为新权威,协同房间按新状态重建
     return { id, version: nextVersion };
   }
 
@@ -209,6 +214,7 @@ export class DocumentsService {
     await this.docRepo.delete({ id: In(all) });
     await this.versionRepo.delete({ documentId: In(all) });
     await this.docMemberRepo.delete({ documentId: In(all) });
+    all.forEach((docId) => this.collab.resetRoom(docId)); // 正在被协同编辑的子文档一并断开
     await this.audit.log(user.id, user.username, 'DOC_DELETE', `doc:${id}`, { title: doc.title });
     return true;
   }

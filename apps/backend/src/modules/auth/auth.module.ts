@@ -6,6 +6,7 @@ import { User } from '../users/entities/user.entity';
 import { UsersModule } from '../users/users.module';
 import { AuditModule } from '../audit/audit.module';
 import { TeamsModule } from '../teams/teams.module';
+import { JWT_SECRET } from '../../common/constants/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
@@ -18,7 +19,7 @@ import { JwtStrategy } from './jwt.strategy';
     PassportModule,
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET || 'zxh-jwt-secret-change-me-in-production',
+      secret: JWT_SECRET,
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '12h' },
     }),
     TypeOrmModule.forFeature([User]),

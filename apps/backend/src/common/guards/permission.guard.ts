@@ -41,6 +41,7 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== 'http') return true; // WebSocket 由协同网关复用同套逻辑判定
     const req = this.reflector.getAllAndOverride<PermRequirement>(PERM_META_KEY, [
       context.getHandler(),
       context.getClass(),

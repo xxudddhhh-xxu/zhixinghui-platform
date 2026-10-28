@@ -19,6 +19,9 @@ export interface PermissionSnapshot {
 const SNAP_KEY = (userId: string) => `perm:snap:${userId}`;
 const SNAP_TTL_SEC = 600;
 
+/** 权限失效广播频道:协同网关订阅后对在线连接实时重算权限(降只读/断开) */
+export const PERM_INVALIDATE_CHANNEL = 'perm:invalidate';
+
 /**
  * 权限快照服务:两级(团队 → 文档)角色权限模型。
  * 快照写入 Redis 缓存,鉴权守卫与前端按钮显隐共用,成员变更时主动失效。
@@ -68,11 +71,14 @@ export class PermissionCacheService {
     };
   }
 
-  /** 成员变更后失效快照(可传团队成员列表对应的全部用户) */
+  /** 成员变更后失效快照(可传团队成员列表对应的全部用户);同时广播事件供协同网关实时降级/踢出 */
   async invalidate(userIds: string | string[]) {
     const ids = Array.isArray(userIds) ? userIds : [userIds];
     try {
-      if (ids.length) await this.redis.del(...ids.map(SNAP_KEY));
+      if (ids.length) {
+        await this.redis.del(...ids.map(SNAP_KEY));
+        await this.redis.publish(PERM_INVALIDATE_CHANNEL, JSON.stringify(ids));
+      }
     } catch {
       /* ignore */
     }

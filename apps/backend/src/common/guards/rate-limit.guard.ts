@@ -29,6 +29,7 @@ export class RateLimitGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    if (context.getType() !== 'http') return true; // WebSocket 消息不走 HTTP 限流(协同网关自管)
     const options =
       this.reflector.getAllAndOverride<RateLimitOptions>(RATE_LIMIT_KEY, [
         context.getHandler(),
